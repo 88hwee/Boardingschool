@@ -1,0 +1,309 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hall Operations</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f5f7fb;color:#263348;font-family:Arial,sans-serif}
+header{background:white;padding:22px;border-bottom:1px solid #ddd}
+.container{max-width:1100px;margin:auto;padding:18px}
+h1{margin:0 0 8px;font-size:26px}
+h2{font-size:17px}
+input,textarea,button{font:inherit}
+.search{width:100%;max-width:340px;padding:12px;border:1px solid #ddd;border-radius:10px;margin-top:15px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:20px}
+.metric{background:#edf0f5;padding:15px;border-radius:12px;text-align:center}
+.metric strong{display:block;font-size:26px;margin-top:6px}
+.metric span{font-size:12px;font-weight:bold}
+.green{background:#e4f8ec;color:#087345}
+.blue{background:#e6f0ff;color:#285fb3}
+.red{background:#ffe9e9;color:#aa3434}
+.room{background:white;border:1px solid #ddd;border-radius:15px;margin:20px 0;overflow:hidden}
+.room h2{background:#f0f2f6;margin:0;padding:14px}
+.students{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:15px}
+.student{border:2px solid #dce3ec;border-radius:12px;overflow:hidden}
+.student.present{border-color:#a5dfbd}
+.student.late{border-color:#efcf78}
+.student.absent{border-color:#e9a4a4}
+.face{display:flex;align-items:center;flex-direction:column;justify-content:center;width:100%;min-height:145px;padding:14px;background:white;border:0;position:relative;cursor:pointer}
+.bed{position:absolute;top:8px;left:10px;color:#888;font-size:12px}
+.warning{position:absolute;top:8px;right:10px;color:red}
+.avatar{width:54px;height:54px;border-radius:50%;background:#def6e7;color:#147747;display:grid;place-items:center;font-size:23px;font-weight:bold;margin-bottom:10px}
+.name{text-align:center;font-size:14px;font-weight:bold}
+.status{width:100%;border:0;border-top:1px solid #ddd;padding:12px;text-align:left;cursor:pointer;font-weight:bold;font-size:12px}
+.status.present{background:#e4f8ec;color:#087345}
+.status.late{background:#fff4cf;color:#886500}
+.status.activity{background:#e6f0ff;color:#285fb3}
+.status.absent{background:#ffe9e9;color:#aa3434}
+.status.stayout{background:#fff0d8;color:#a15b0a}
+.shade{position:fixed;inset:0;background:#17243a88;display:none;z-index:5}
+.modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(94%,480px);max-height:90vh;overflow:auto;background:white;border-radius:18px;display:none;z-index:6;padding:20px;box-shadow:0 15px 50px #0003}
+.show{display:block}
+.modalhead{display:flex;justify-content:space-between;align-items:start}
+.close{border:0;border-radius:50%;background:#eee;width:34px;height:34px;cursor:pointer}
+.tabs{display:flex;margin:20px 0;border-bottom:1px solid #ddd}
+.tabs button{flex:1;padding:12px;border:0;background:white;cursor:pointer}
+.tabs button.active{border-bottom:3px solid #5146c8;color:#5146c8;font-weight:bold}
+.choice{display:block;width:100%;text-align:left;padding:13px;margin:7px 0;border:1px solid #ddd;background:white;border-radius:10px;cursor:pointer}
+.choice.chosen{border:2px solid #5146c8;background:#f0efff}
+textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 24px}
+.pills button{padding:9px;border:1px solid #ddd;border-radius:9px;background:#f8f9fb;cursor:pointer}
+.incident{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0;display:flex;justify-content:space-between;gap:10px}
+.incident p{font-size:13px;color:#666}
+.remove{border:0;background:white;color:#c33;cursor:pointer}
+.notice{background:#fff3cf;padding:12px;text-align:center;font-size:12px}
+@media(max-width:700px){
+.students{grid-template-columns:repeat(2,1fr);gap:9px;padding:10px}
+.metric{padding:9px}
+.metric strong{font-size:20px}
+.metric span{font-size:10px}
+.modal{top:auto;bottom:0;left:0;transform:none;width:100%;border-radius:20px 20px 0 0}
+}
+</style>
+</head>
+<body>
+<div class="notice">
+<strong>DEMONSTRATION ONLY</strong> — Fictional students.
+Do not enter real student or confidential information.
+</div>
+
+<header>
+<div class="container">
+<h1>Hall Operations</h1>
+<div id="today"></div>
+<input id="search" class="search" placeholder="Search name or room">
+<div class="metrics" id="metrics"></div>
+</div>
+</header>
+
+<main class="container" id="rooms"></main>
+<div class="shade" id="shade"></div>
+<div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+
+<script>
+"use strict";
+
+const KEY = "hall-demo-v1";
+
+const INITIAL = [
+{id:"1",name:"Demo Student A",room:"532",bed:"A",status:"Present",discipline:[]},
+{id:"2",name:"Demo Student B",room:"532",bed:"B",status:"Present",discipline:[{id:"d1",date:"21 Oct 2026",type:"Late for prep",details:"Example incident"}]},
+{id:"3",name:"Demo Student C",room:"532",bed:"C",status:"Present",discipline:[]},
+{id:"4",name:"Demo Student D",room:"532",bed:"D",status:"Present",discipline:[]},
+{id:"5",name:"Demo Student E",room:"533",bed:"A",status:"Present",discipline:[]},
+{id:"6",name:"Demo Student F",room:"533",bed:"B",status:"Present",discipline:[]},
+{id:"7",name:"Demo Student G",room:"533",bed:"C",status:"Present",discipline:[]},
+{id:"8",name:"Demo Student H",room:"533",bed:"D",status:"Present",discipline:[]},
+{id:"9",name:"Demo Student I",room:"534",bed:"A",status:"Present",discipline:[]},
+{id:"10",name:"Demo Student J",room:"534",bed:"B",status:"Present",discipline:[]}
+];
+
+const STATUSES = [
+"Present","Late","CCA","Tuition (In-house)",
+"Tuition (Outside)","Truancy",
+"Absent with valid reason","Stay out"
+];
+
+const ISSUES = [
+"Cleanliness","Late for prep","Truancy",
+"Broke curfew","Stealing","Bullying"
+];
+
+let students;
+try {
+const saved=JSON.parse(localStorage.getItem(KEY));
+students=Array.isArray(saved)&&saved.length===INITIAL.length
+?saved:structuredClone(INITIAL);
+} catch {
+students=structuredClone(INITIAL);
+}
+
+let selected=null;
+let tab="attendance";
+const $=id=>document.getElementById(id);
+
+function esc(s){
+return String(s).replace(/[&<>"']/g,c=>({
+"&":"&amp;","<":"&lt;",">":"&gt;",
+'"':"&quot;","'":"&#39;"
+}[c]));
+}
+
+function save(){
+try{localStorage.setItem(KEY,JSON.stringify(students))}catch{}
+}
+
+function cls(s){
+if(s==="Present")return "present";
+if(s==="Late")return "late";
+if(["CCA","Tuition (In-house)","Tuition (Outside)"].includes(s))return "activity";
+if(s==="Stay out")return "stayout";
+return "absent";
+}
+
+function render(){
+const present=students.filter(s=>["Present","Late"].includes(s.status)).length;
+const activities=students.filter(s=>["CCA","Tuition (In-house)","Tuition (Outside)"].includes(s.status)).length;
+const absent=students.length-present-activities;
+
+$("metrics").innerHTML=[
+["Total",students.length,""],
+["Present",present,"green"],
+["Activity",activities,"blue"],
+["Absent",absent,"red"]
+].map(([label,n,color])=>
+`<div class="metric ${color}"><span>${label}</span><strong>${n}</strong></div>`
+).join("");
+
+const q=$("search").value.toLowerCase().trim();
+const grouped={};
+students.forEach(s=>{
+if(!grouped[s.room])grouped[s.room]=[];
+grouped[s.room].push(s);
+});
+
+$("rooms").innerHTML=Object.entries(grouped)
+.filter(([room,people])=>
+room.toLowerCase().includes(q)||
+people.some(s=>s.name.toLowerCase().includes(q))
+)
+.map(([room,people])=>`
+<section class="room">
+<h2>Room ${esc(room)}</h2>
+<div class="students">
+${people.map(s=>`
+<div class="student ${cls(s.status)}">
+<button class="face" data-present="${s.id}">
+<span class="bed">${esc(s.bed)}</span>
+${s.discipline.length?'<span class="warning">⚠</span>':""}
+<span class="avatar">${esc(s.name[0])}</span>
+<span class="name">${esc(s.name)}</span>
+</button>
+<button class="status ${cls(s.status)}" data-open="${s.id}">
+${esc(s.status)} ▼
+</button>
+</div>`).join("")}
+</div>
+</section>`).join("")||
+"<p>No matching rooms or students.</p>";
+}
+
+function openStudent(id){
+selected=id;
+tab="attendance";
+renderModal();
+}
+
+function closeModal(){
+selected=null;
+$("shade").classList.remove("show");
+$("modal").classList.remove("show");
+}
+
+function renderModal(){
+const s=students.find(x=>x.id===selected);
+if(!s){closeModal();return;}
+
+$("shade").classList.add("show");
+$("modal").classList.add("show");
+
+$("modal").innerHTML=`
+<div class="modalhead">
+<div>
+<strong>${esc(s.name)}</strong>
+<p>Room ${esc(s.room)} • Bed ${esc(s.bed)}</p>
+</div>
+<button class="close" data-close>×</button>
+</div>
+<div class="tabs">
+<button data-tab="attendance" class="${tab==="attendance"?"active":""}">Set Status</button>
+<button data-tab="discipline" class="${tab==="discipline"?"active":""}">Discipline (${s.discipline.length})</button>
+</div>
+<div>
+${tab==="attendance"
+?STATUSES.map(st=>`
+<button class="choice ${s.status===st?"chosen":""}" data-status="${esc(st)}">
+${s.status===st?"✓ ":""}${esc(st)}
+</button>`).join("")
+:`
+<strong>Add Incident</strong>
+<p><textarea id="details" rows="2" placeholder="Optional fictional details"></textarea></p>
+<div class="pills">
+${ISSUES.map(issue=>`
+<button data-issue="${esc(issue)}">+ ${esc(issue)}</button>
+`).join("")}
+</div>
+<strong>History</strong>
+${s.discipline.length
+?s.discipline.map(d=>`
+<div class="incident">
+<div>
+<strong>${esc(d.type)}</strong>
+<p>${esc(d.date)}</p>
+<p>${esc(d.details||"")}</p>
+</div>
+<button class="remove" data-remove="${esc(d.id)}">✕</button>
+</div>`).join("")
+:"<p>No incidents recorded.</p>"
+}
+`}
+</div>`;
+}
+
+$("today").textContent=new Date().toLocaleDateString("en-GB",{
+weekday:"long",day:"numeric",month:"long",year:"numeric"
+});
+
+$("search").addEventListener("input",render);
+$("shade").addEventListener("click",closeModal);
+document.addEventListener("keydown",e=>{
+if(e.key==="Escape")closeModal();
+});
+
+document.addEventListener("click",e=>{
+const b=e.target.closest("button");
+if(!b)return;
+
+if(b.dataset.present){
+students.find(s=>s.id===b.dataset.present).status="Present";
+save();render();
+}
+else if(b.dataset.open){
+openStudent(b.dataset.open);
+}
+else if(b.hasAttribute("data-close")){
+closeModal();
+}
+else if(b.dataset.tab){
+tab=b.dataset.tab;
+renderModal();
+}
+else if(b.dataset.status){
+students.find(s=>s.id===selected).status=b.dataset.status;
+save();render();closeModal();
+}
+else if(b.dataset.issue){
+const s=students.find(s=>s.id===selected);
+s.discipline.unshift({
+id:String(Date.now()),
+date:new Date().toLocaleString("en-GB"),
+type:b.dataset.issue,
+details:$("details").value.trim()
+});
+save();render();renderModal();
+}
+else if(b.dataset.remove){
+const s=students.find(s=>s.id===selected);
+s.discipline=s.discipline.filter(d=>d.id!==b.dataset.remove);
+save();render();renderModal();
+}
+});
+
+render();
+</script>
+</body>
+</html>
